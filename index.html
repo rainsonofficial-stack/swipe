@@ -25,20 +25,21 @@
             touch-action: none;
         }
 
-        /* Stealth Mode Toggle */
+        /* Stealth Mode Class */
         .hidden-ui {
             visibility: hidden !important;
+            opacity: 0;
         }
 
         #top-container {
             margin-top: 18vh;
             text-align: center;
-            transition: visibility 0.2s;
+            transition: opacity 0.3s ease;
         }
 
         #time-display {
-            font-size: 5.8rem; /* Increased size slightly */
-            font-weight: 600; /* Reduced boldness (from 800) */
+            font-size: 6rem;
+            font-weight: 500;
             color: #ffffff;
             line-height: 1;
         }
@@ -54,7 +55,7 @@
             justify-content: space-between;
             padding: 40px;
             position: relative;
-            transition: visibility 0.2s;
+            transition: opacity 0.3s ease;
         }
 
         .icon-svg {
@@ -69,13 +70,13 @@
             right: 40px;
             bottom: 85px;
             font-size: 0.8rem;
-            color: #222; /* Very dark/discreet */
+            color: #222;
             font-family: monospace;
             pointer-events: none;
         }
     </style>
 </head>
-<body>
+<body id="main-body">
 
     <div id="top-container">
         <div id="time-display">12:00</div>
@@ -104,6 +105,7 @@
         let startY = null;
         let longPressTimer = null;
         let swipeTriggered = false;
+        let isStealth = false;
 
         // --- 12HR CLOCK ---
         function updateTime() {
@@ -119,16 +121,30 @@
         setInterval(updateTime, 1000);
         updateTime();
 
-        // --- STEALTH MODE (Double Tap Phone) ---
-        let lastPhoneTap = 0;
-        document.getElementById('phone-trigger').addEventListener('touchstart', (e) => {
+        // --- STEALTH & RESET LOGIC ---
+        let lastBodyTap = 0;
+        document.getElementById('main-body').addEventListener('touchstart', (e) => {
             const now = Date.now();
-            if (now - lastPhoneTap < 300) {
-                document.getElementById('top-container').classList.toggle('hidden-ui');
-                document.getElementById('bottom-container').classList.toggle('hidden-ui');
-                navigator.vibrate(50);
+            
+            // Toggle Stealth (Anywhere on body if stealth is ON, or Phone icon if OFF)
+            if (isStealth && (now - lastBodyTap < 300)) {
+                toggleStealth();
             }
-            lastPhoneTap = now;
+            lastBodyTap = now;
+        });
+
+        function toggleStealth() {
+            isStealth = !isStealth;
+            document.getElementById('top-container').classList.toggle('hidden-ui');
+            document.getElementById('bottom-container').classList.toggle('hidden-ui');
+            navigator.vibrate(50);
+        }
+
+        document.getElementById('phone-trigger').addEventListener('touchstart', (e) => {
+            if (!isStealth) {
+                const now = Date.now();
+                // Handled by the global body tap logic for consistency, but kept for direct trigger
+            }
         });
 
         // --- RESET (Double Tap Time) ---
@@ -149,7 +165,6 @@
         document.getElementById('camera-trigger').addEventListener('touchstart', (e) => {
             const now = Date.now();
             if (now - lastCamTap < 300) {
-                // Shows current buffer OR last sent number
                 document.getElementById('debug-text').innerText = collectedCode || `Last: ${lastSentCode}`;
                 setTimeout(() => { document.getElementById('debug-text').innerText = ""; }, 3000);
             }
@@ -173,7 +188,7 @@
 
             let diffX = e.touches[0].clientX - startX;
             let diffY = e.touches[0].clientY - startY;
-            const threshold = 25; // Change #6: Reduced from 35 to 25 for micro-swipes
+            const threshold = 15; // Extremely responsive threshold
 
             if (Math.abs(diffX) > threshold || Math.abs(diffY) > threshold) {
                 let dir = Math.abs(diffX) > Math.abs(diffY) ? (diffX > 0 ? "R" : "L") : (diffY > 0 ? "D" : "U");
@@ -195,8 +210,8 @@
                 const pair = swipeBuffer + dir;
                 const map = {
                     "UU":"0","UR":"1","RU":"2","RR":"3","RD":"4","DR":"5","DD":"6","DL":"7","LD":"8","LL":"9",
-                    "LU":" ",   // Change #2: Left + Up = Space
-                    "UL":"  "   // Change #3: Up + Left = Double Space
+                    "LU":" ",   // Single Space
+                    "UL":"  "   // Double Space
                 };
                 if (map[pair] !== undefined) {
                     collectedCode += map[pair];
@@ -209,7 +224,7 @@
         function sendData() {
             if (collectedCode.length === 0) return;
             navigator.vibrate(800);
-            lastSentCode = collectedCode; // Store for debug view
+            lastSentCode = collectedCode;
             
             fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
