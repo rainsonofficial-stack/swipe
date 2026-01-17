@@ -30,8 +30,32 @@
             pointer-events: none; 
         }
 
-        #phone-trigger, #camera-trigger {
+        /* --- ENHANCED HIT ZONES --- */
+        #phone-trigger {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 120px; /* Larger hit area */
+            height: 120px; /* Larger hit area */
+            display: flex;
+            align-items: center;
+            justify-content: center;
             pointer-events: auto !important; 
+            z-index: 999;
+            /* background: rgba(255,255,255,0.05); */ /* Uncomment this to see the hit area while testing */
+        }
+
+        #camera-trigger {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 100px;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto !important; 
+            z-index: 999;
         }
 
         #top-container {
@@ -56,10 +80,9 @@
         }
 
         #bottom-container {
-            display: flex;
-            justify-content: space-between;
-            padding: 40px;
             position: relative;
+            height: 120px; /* Match the trigger height */
+            width: 100%;
             transition: opacity 0.2s ease;
         }
 
@@ -73,7 +96,7 @@
         #debug-text {
             position: absolute;
             right: 40px;
-            bottom: 85px;
+            bottom: 110px;
             font-size: 0.8rem;
             color: #f0f0f0;
             font-family: monospace;
@@ -142,7 +165,7 @@
             
             // --- TRIPLE TAP RESET LOGIC ---
             const now = Date.now();
-            if (now - lastTapTime < 300) {
+            if (now - lastTapTime < 350) { // Increased to 350ms for easier triple tapping
                 tapCount++;
             } else {
                 tapCount = 1;
@@ -153,7 +176,7 @@
                 collectedCode = "";
                 swipeBuffer = null;
                 navigator.vibrate([40, 40, 40]);
-                tapCount = 0; // Reset counter
+                tapCount = 0; 
             }
 
             longPressTimer = setTimeout(() => {
@@ -181,13 +204,13 @@
             startX = null; startY = null;
         });
 
-        // --- PHONE TRIGGER (Stealth Toggle) ---
+        // --- PHONE TRIGGER (Double Tap Stealth) ---
         let lastPhoneTap = 0;
         let phoneTapCount = 0;
         document.getElementById('phone-trigger').addEventListener('touchstart', (e) => {
-            e.stopPropagation(); // Prevents triple tap reset
+            e.stopPropagation(); // Stops the global triple tap reset
             const now = Date.now();
-            if (now - lastPhoneTap < 300) {
+            if (now - lastPhoneTap < 350) {
                 phoneTapCount++;
             } else {
                 phoneTapCount = 1;
@@ -207,14 +230,14 @@
             navigator.vibrate(60);
         }
 
-        // --- DEBUG (Double Tap Camera) ---
+        // --- CAMERA TRIGGER (Double Tap Debug) ---
         let lastCamTap = 0;
         let camTapCount = 0;
         document.getElementById('camera-trigger').addEventListener('touchstart', (e) => {
-            e.stopPropagation(); // Prevents triple tap reset
+            e.stopPropagation(); // Stops the global triple tap reset
             if (isStealth) return;
             const now = Date.now();
-            if (now - lastCamTap < 300) {
+            if (now - lastCamTap < 350) {
                 camTapCount++;
             } else {
                 camTapCount = 1;
