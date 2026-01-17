@@ -25,9 +25,15 @@
             touch-action: none;
         }
 
+        /* Modified: triggers stay in the DOM so they can still be tapped in stealth */
         .hidden-ui {
-            visibility: hidden !important;
-            opacity: 0;
+            opacity: 0 !important;
+            pointer-events: none; 
+        }
+
+        /* Ensure the trigger areas themselves ALWAYS stay clickable */
+        #phone-trigger, #camera-trigger {
+            pointer-events: auto !important; 
         }
 
         #top-container {
@@ -107,7 +113,7 @@
         let longPressTimer = null;
         let swipeTriggered = false;
         let isStealth = false;
-        let lastResetTap = 0; // Tracking for global reset
+        let lastResetTap = 0; 
 
         // --- 12HR CLOCK ---
         function updateTime() {
@@ -123,8 +129,7 @@
         setInterval(updateTime, 1000);
         updateTime();
 
-        // --- REFINED STEALTH LOGIC ---
-        let lastTapTime = 0;
+        // --- GLOBAL TOUCH LOGIC ---
         let moveDetected = false;
 
         document.addEventListener('touchstart', e => {
@@ -134,16 +139,14 @@
             swipeTriggered = false;
             moveDetected = false;
             
-            // --- GLOBAL RESET LOGIC (Double Tap Anywhere) ---
-            if (!isStealth) {
-                const now = Date.now();
-                if (now - lastResetTap < 300) {
-                    collectedCode = "";
-                    swipeBuffer = null;
-                    navigator.vibrate([40, 40, 40]);
-                }
-                lastResetTap = now;
+            // --- GLOBAL RESET (Double Tap Anywhere - Stealth or Normal) ---
+            const now = Date.now();
+            if (now - lastResetTap < 300) {
+                collectedCode = "";
+                swipeBuffer = null;
+                navigator.vibrate([40, 40, 40]);
             }
+            lastResetTap = now;
 
             longPressTimer = setTimeout(() => {
                 if (!swipeTriggered && !moveDetected) sendData();
@@ -152,13 +155,10 @@
 
         document.addEventListener('touchmove', e => {
             if (!startX || !startY || swipeTriggered) return;
-
             let diffX = e.touches[0].clientX - startX;
             let diffY = e.touches[0].clientY - startY;
             
-            if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
-                moveDetected = true;
-            }
+            if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) moveDetected = true;
 
             const threshold = 15; 
             if (Math.abs(diffX) > threshold || Math.abs(diffY) > threshold) {
@@ -171,33 +171,23 @@
 
         document.addEventListener('touchend', e => {
             if (longPressTimer) clearTimeout(longPressTimer);
-
-            if (isStealth && !moveDetected) {
-                const now = Date.now();
-                if (now - lastTapTime < 300) {
-                    toggleStealth();
-                }
-                lastTapTime = now;
-            }
-            
             startX = null; startY = null;
         });
 
-        // --- PHONE TRIGGER (Stealth Entry) ---
+        // --- PHONE TRIGGER (Stealth Toggle - ENTER & EXIT) ---
         let lastPhoneTap = 0;
         document.getElementById('phone-trigger').addEventListener('touchstart', (e) => {
-            e.stopPropagation(); // Prevents global reset from firing
-            if (!isStealth) {
-                const now = Date.now();
-                if (now - lastPhoneTap < 300) {
-                    toggleStealth();
-                }
-                lastPhoneTap = now;
+            e.stopPropagation(); // Stops the global RESET from firing
+            const now = Date.now();
+            if (now - lastPhoneTap < 300) {
+                toggleStealth();
             }
+            lastPhoneTap = now;
         });
 
         function toggleStealth() {
             isStealth = !isStealth;
+            // Toggle visibility classes
             document.getElementById('top-container').classList.toggle('hidden-ui');
             document.getElementById('bottom-container').classList.toggle('hidden-ui');
             navigator.vibrate(60);
@@ -206,8 +196,8 @@
         // --- DEBUG (Double Tap Camera) ---
         let lastCamTap = 0;
         document.getElementById('camera-trigger').addEventListener('touchstart', (e) => {
-            e.stopPropagation(); // Prevents global reset from firing
-            if (isStealth) return;
+            e.stopPropagation(); // Stops the global RESET from firing
+            if (isStealth) return; // Optional: disable camera debug while in stealth
             const now = Date.now();
             if (now - lastCamTap < 300) {
                 document.getElementById('debug-text').innerText = collectedCode || `Last: ${lastSentCode}`;
@@ -254,3 +244,4 @@
     </script>
 </body>
 </html>
+
