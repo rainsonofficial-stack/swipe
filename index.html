@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>AOD Magic</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        body, html {
+            background-color: #000000;
+            color: #d1d1d1; /* Slight grey for AOD look */
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Time & Date Section */
+        #top-container {
+            margin-top: 35vh; /* Vertically slightly above center */
+            text-align: center;
+        }
+
+        #time-display {
+            font-size: 4.5rem;
+            font-weight: 200;
+            color: #ffffff;
+            letter-spacing: 2px;
+        }
+
+        #date-display {
+            font-size: 1.2rem;
+            margin-top: 5px;
+            color: #a0a0a0;
+        }
+
+        /* Debug/Status hidden by default, visible if needed for testing */
+        #status-log {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 10px;
+            color: #333;
+            pointer-events: none; 
+        }
+
+        /* Bottom Icons */
+        #bottom-container {
+            display: flex;
+            justify-content: space-between;
+            padding: 40px;
+            font-size: 1.8rem;
+            color: #888;
+        }
+
+        .icon {
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="status-log"></div>
+
+    <div id="top-container">
+        <div id="time-display">12:00</div>
+        <div id="date-display">Mon, Jan 1</div>
+    </div>
+
+    <div id="bottom-container">
+        <div class="icon">&#128222;</div> <div class="icon">&#128247;</div> </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const GOOGLE_SCRIPT_URL = "INSERT_YOUR_GOOGLE_SCRIPT_URL_HERE"; 
+        
+        // --- STATE VARIABLES ---
+        let collectedCode = "";
+        let swipeBuffer = null; // Stores the first swipe of the pair
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let longPressTimer = null;
+        
+        const timeDisplay = document.getElementById('time-display');
+        const dateDisplay = document.getElementById('date-display');
+        const statusLog = document.getElementById('status-log');
+
+        // --- CLOCK FUNCTIONALITY ---
+        function updateTime() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            
+            timeDisplay.innerText = `${hours}:${minutes}`;
+            dateDisplay.innerText = `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}`;
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // --- DOUBLE TAP RESET ---
+        let lastTap = 0;
+        timeDisplay.addEventListener('click', (e) => {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTap;
+            if (tapLength < 500 && tapLength > 0) {
+                // Double tap detected
+                collectedCode = "";
+                swipeBuffer = null;
+                navigator.vibrate([50, 50, 50]); // Quick buzz-buzz-buzz
+                console.log("Reset");
+            }
+            lastTap = currentTime;
+        });
+
+        // --- TOUCH & GESTURE LOGIC ---
+        document.body.addEventListener('touchstart', e => {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+            
+            // Start Long Press Timer (3 seconds)
+            longPressTimer = setTimeout(() => {
+                sendData();
+            }, 3000);
+        });
+
+        document.body.addEventListener('touchend', e => {
+            // Cancel long press if finger is lifted early
+            if (longPressTimer) clearTimeout(longPressTimer);
+
+            let touchEndX = e.changedTouches[0].screenX;
+            let touchEndY = e.changedTouches[0].screenY;
+            handleSwipe(touchStartX, touchStartY, touchEndX, touchEndY);
+        });
+
+        function handleSwipe(sx, sy, ex, ey) {
+            const diffX = ex - sx;
+            const diffY = ey - sy;
+            const absX = Math.abs(diffX);
+            const absY = Math.abs(diffY);
+            
+            // Minimum threshold to consider it a swipe
+            if (Math.max(absX, absY) < 30) return; 
+
+            let direction = "";
+            if (absX > absY) {
+                direction = diffX > 0 ? "R" : "L";
+            } else {
+                direction = diffY > 0 ? "D" : "U";
+            }
+
+            processSwipeDirection(direction);
+        }
+
+        // --- MAGIC LOGIC MAP ---
+        function processSwipeDirection(dir) {
+            if (!swipeBuffer) {
+                // This is the first swipe of the pair
+                swipeBuffer = dir;
+            } else {
+                // This is the second swipe, we have a pair
+                const pair = swipeBuffer + dir;
+                let digit = null;
+
+                // Mapping based on your request
+                // U=Up, R=Right, D=Down, L=Left
+                const map = {
+                    "UU": "0",
+                    "UR": "1",
+                    "RU": "2",
+                    "RR": "3",
+                    "RD": "4",
+                    "DR": "5",
+                    "DD": "6",
+                    "DL": "7",
+                    "LD": "8",
+                    "LL": "9"
+                };
+
+                digit = map[pair];
+
+                if (digit !== undefined) {
+                    collectedCode += digit;
+                    navigator.vibrate(200); // Success buzz
+                    // statusLog.innerText = collectedCode; // Uncomment to see code on screen for testing
+                } else {
+                    // Invalid combination, reset buffer to keep flow smooth or handle error
+                    // For now, we just ignore invalid pairs
+                }
+                
+                // Reset buffer for next pair
+                swipeBuffer = null;
+            }
+        }
+
+        // --- SEND DATA ---
+        function sendData() {
+            if (collectedCode.length === 0) return;
+
+            navigator.vibrate(1000); // Long vibration indicating send
+            
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors', // Important for Google Script Web Apps
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ code: collectedCode })
+            }).then(() => {
+                collectedCode = ""; // Reset after sending
+                console.log("Sent");
+            }).catch(err => console.error(err));
+        }
+
+        // --- SERVICE WORKER REGISTRATION ---
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+    </script>
+</body>
+</html>
