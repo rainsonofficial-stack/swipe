@@ -1,6 +1,6 @@
 {
   "name": "AOD Swipe",
-  "short_name": "AOD",
+  "short_name": "Swipe",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#000000",
