@@ -32,22 +32,24 @@
         }
 
         #top-container {
-            margin-top: 18vh;
+            margin-top: 15vh; /* Adjusted for larger font */
             text-align: center;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.2s ease;
         }
 
         #time-display {
-            font-size: 6rem;
-            font-weight: 500;
+            font-size: 7.5rem; /* Larger font */
+            font-weight: 200; /* Much less bold, elegant AOD look */
             color: #ffffff;
             line-height: 1;
+            letter-spacing: -2px;
         }
 
         #date-display {
-            font-size: 1.2rem;
-            margin-top: 8px;
+            font-size: 1.3rem;
+            margin-top: 5px;
             color: #8e8e8e;
+            font-weight: 300;
         }
 
         #bottom-container {
@@ -55,14 +57,14 @@
             justify-content: space-between;
             padding: 40px;
             position: relative;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.2s ease;
         }
 
         .icon-svg {
             width: 30px;
             height: 30px;
             fill: white;
-            opacity: 0.8;
+            opacity: 0.7;
         }
 
         #debug-text {
@@ -70,7 +72,7 @@
             right: 40px;
             bottom: 85px;
             font-size: 0.8rem;
-            color: #222;
+            color: #1a1a1a; /* Nearly invisible */
             font-family: monospace;
             pointer-events: none;
         }
@@ -121,35 +123,40 @@
         setInterval(updateTime, 1000);
         updateTime();
 
-        // --- STEALTH & RESET LOGIC ---
-        let lastBodyTap = 0;
+        // --- GLOBAL TOUCH HANDLER (Double tap anywhere to wake) ---
+        let lastTapTime = 0;
         document.getElementById('main-body').addEventListener('touchstart', (e) => {
             const now = Date.now();
-            
-            // Toggle Stealth (Anywhere on body if stealth is ON, or Phone icon if OFF)
-            if (isStealth && (now - lastBodyTap < 300)) {
+            if (isStealth && (now - lastTapTime < 300)) {
                 toggleStealth();
             }
-            lastBodyTap = now;
-        });
+            lastTapTime = now;
+        }, {passive: false});
+
+        // --- PHONE TRIGGER (Double tap to hide) ---
+        let lastPhoneTap = 0;
+        document.getElementById('phone-trigger').addEventListener('touchstart', (e) => {
+            if (!isStealth) {
+                const now = Date.now();
+                if (now - lastPhoneTap < 300) {
+                    toggleStealth();
+                }
+                lastPhoneTap = now;
+            }
+            e.stopPropagation(); // Prevents conflict with body listener
+        }, {passive: false});
 
         function toggleStealth() {
             isStealth = !isStealth;
             document.getElementById('top-container').classList.toggle('hidden-ui');
             document.getElementById('bottom-container').classList.toggle('hidden-ui');
-            navigator.vibrate(50);
+            navigator.vibrate(60);
         }
-
-        document.getElementById('phone-trigger').addEventListener('touchstart', (e) => {
-            if (!isStealth) {
-                const now = Date.now();
-                // Handled by the global body tap logic for consistency, but kept for direct trigger
-            }
-        });
 
         // --- RESET (Double Tap Time) ---
         let lastTimeTap = 0;
         document.getElementById('top-container').addEventListener('touchstart', (e) => {
+            if (isStealth) return;
             const now = Date.now();
             if (now - lastTimeTap < 300) {
                 collectedCode = "";
@@ -158,18 +165,21 @@
                 navigator.vibrate([40, 40, 40]);
             }
             lastTimeTap = now;
-        });
+            e.stopPropagation();
+        }, {passive: false});
 
         // --- DEBUG (Double Tap Camera) ---
         let lastCamTap = 0;
         document.getElementById('camera-trigger').addEventListener('touchstart', (e) => {
+            if (isStealth) return;
             const now = Date.now();
             if (now - lastCamTap < 300) {
                 document.getElementById('debug-text').innerText = collectedCode || `Last: ${lastSentCode}`;
-                setTimeout(() => { document.getElementById('debug-text').innerText = ""; }, 3000);
+                setTimeout(() => { document.getElementById('debug-text').innerText = ""; }, 4000);
             }
             lastCamTap = now;
-        });
+            e.stopPropagation();
+        }, {passive: false});
 
         // --- SWIPE LOGIC ---
         document.addEventListener('touchstart', e => {
@@ -180,7 +190,7 @@
             
             longPressTimer = setTimeout(() => {
                 if (!swipeTriggered) sendData();
-            }, 2000);
+            }, 2000); // 2 Seconds
         }, {passive: false});
 
         document.addEventListener('touchmove', e => {
@@ -188,7 +198,7 @@
 
             let diffX = e.touches[0].clientX - startX;
             let diffY = e.touches[0].clientY - startY;
-            const threshold = 15; // Extremely responsive threshold
+            const threshold = 15; // Shorter swipe sensitivity
 
             if (Math.abs(diffX) > threshold || Math.abs(diffY) > threshold) {
                 let dir = Math.abs(diffX) > Math.abs(diffY) ? (diffX > 0 ? "R" : "L") : (diffY > 0 ? "D" : "U");
@@ -210,12 +220,12 @@
                 const pair = swipeBuffer + dir;
                 const map = {
                     "UU":"0","UR":"1","RU":"2","RR":"3","RD":"4","DR":"5","DD":"6","DL":"7","LD":"8","LL":"9",
-                    "LU":" ",   // Single Space
-                    "UL":"  "   // Double Space
+                    "LU":" ",   // Spacebar once
+                    "UL":"  "   // Spacebar twice
                 };
                 if (map[pair] !== undefined) {
                     collectedCode += map[pair];
-                    navigator.vibrate(100);
+                    navigator.vibrate(80);
                 }
                 swipeBuffer = null;
             }
