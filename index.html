@@ -25,31 +25,30 @@
             touch-action: none;
         }
 
-        /* Stealth Mode Class */
         .hidden-ui {
             visibility: hidden !important;
             opacity: 0;
         }
 
         #top-container {
-            margin-top: 15vh; /* Adjusted for larger font */
+            margin-top: 18vh;
             text-align: center;
             transition: opacity 0.2s ease;
         }
 
         #time-display {
-            font-size: 7.5rem; /* Larger font */
-            font-weight: 200; /* Much less bold, elegant AOD look */
+            font-size: 6.2rem; /* Slightly smaller than 7.5 */
+            font-weight: 400; /* Thicker than 200 */
             color: #ffffff;
             line-height: 1;
-            letter-spacing: -2px;
+            letter-spacing: -1px;
         }
 
         #date-display {
-            font-size: 1.3rem;
+            font-size: 1.2rem;
             margin-top: 5px;
             color: #8e8e8e;
-            font-weight: 300;
+            font-weight: 400;
         }
 
         #bottom-container {
@@ -72,7 +71,7 @@
             right: 40px;
             bottom: 85px;
             font-size: 0.8rem;
-            color: #1a1a1a; /* Nearly invisible */
+            color: #1a1a1a;
             font-family: monospace;
             pointer-events: none;
         }
@@ -123,17 +122,58 @@
         setInterval(updateTime, 1000);
         updateTime();
 
-        // --- GLOBAL TOUCH HANDLER (Double tap anywhere to wake) ---
+        // --- REFINED STEALTH LOGIC ---
         let lastTapTime = 0;
-        document.getElementById('main-body').addEventListener('touchstart', (e) => {
-            const now = Date.now();
-            if (isStealth && (now - lastTapTime < 300)) {
-                toggleStealth();
-            }
-            lastTapTime = now;
+        let moveDetected = false;
+
+        document.addEventListener('touchstart', e => {
+            if (e.touches.length > 1) e.preventDefault(); 
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            swipeTriggered = false;
+            moveDetected = false; // Reset move tracking for this touch
+            
+            longPressTimer = setTimeout(() => {
+                if (!swipeTriggered && !moveDetected) sendData();
+            }, 2000);
         }, {passive: false});
 
-        // --- PHONE TRIGGER (Double tap to hide) ---
+        document.addEventListener('touchmove', e => {
+            if (!startX || !startY || swipeTriggered) return;
+
+            let diffX = e.touches[0].clientX - startX;
+            let diffY = e.touches[0].clientY - startY;
+            
+            // If movement is more than 10px, mark as a move (not a tap)
+            if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
+                moveDetected = true;
+            }
+
+            const threshold = 15; 
+            if (Math.abs(diffX) > threshold || Math.abs(diffY) > threshold) {
+                let dir = Math.abs(diffX) > Math.abs(diffY) ? (diffX > 0 ? "R" : "L") : (diffY > 0 ? "D" : "U");
+                processDirection(dir);
+                swipeTriggered = true; 
+                if (longPressTimer) clearTimeout(longPressTimer);
+            }
+        }, {passive: false});
+
+        document.addEventListener('touchend', e => {
+            if (longPressTimer) clearTimeout(longPressTimer);
+
+            // ONLY handle "Wake from Stealth" if NO movement was detected (True Tap)
+            if (isStealth && !moveDetected) {
+                const now = Date.now();
+                if (now - lastTapTime < 300) {
+                    toggleStealth();
+                }
+                lastTapTime = now;
+            }
+            
+            startX = null; startY = null;
+        });
+
+        // --- PHONE TRIGGER (Stealth Entry) ---
         let lastPhoneTap = 0;
         document.getElementById('phone-trigger').addEventListener('touchstart', (e) => {
             if (!isStealth) {
@@ -143,8 +183,7 @@
                 }
                 lastPhoneTap = now;
             }
-            e.stopPropagation(); // Prevents conflict with body listener
-        }, {passive: false});
+        });
 
         function toggleStealth() {
             isStealth = !isStealth;
@@ -161,12 +200,10 @@
             if (now - lastTimeTap < 300) {
                 collectedCode = "";
                 swipeBuffer = null;
-                document.getElementById('debug-text').innerText = "";
                 navigator.vibrate([40, 40, 40]);
             }
             lastTimeTap = now;
-            e.stopPropagation();
-        }, {passive: false});
+        });
 
         // --- DEBUG (Double Tap Camera) ---
         let lastCamTap = 0;
@@ -178,39 +215,6 @@
                 setTimeout(() => { document.getElementById('debug-text').innerText = ""; }, 4000);
             }
             lastCamTap = now;
-            e.stopPropagation();
-        }, {passive: false});
-
-        // --- SWIPE LOGIC ---
-        document.addEventListener('touchstart', e => {
-            if (e.touches.length > 1) e.preventDefault(); 
-            startX = e.touches[0].clientX;
-            startY = e.touches[0].clientY;
-            swipeTriggered = false;
-            
-            longPressTimer = setTimeout(() => {
-                if (!swipeTriggered) sendData();
-            }, 2000); // 2 Seconds
-        }, {passive: false});
-
-        document.addEventListener('touchmove', e => {
-            if (!startX || !startY || swipeTriggered) return;
-
-            let diffX = e.touches[0].clientX - startX;
-            let diffY = e.touches[0].clientY - startY;
-            const threshold = 15; // Shorter swipe sensitivity
-
-            if (Math.abs(diffX) > threshold || Math.abs(diffY) > threshold) {
-                let dir = Math.abs(diffX) > Math.abs(diffY) ? (diffX > 0 ? "R" : "L") : (diffY > 0 ? "D" : "U");
-                processDirection(dir);
-                swipeTriggered = true; 
-                if (longPressTimer) clearTimeout(longPressTimer);
-            }
-        }, {passive: false});
-
-        document.addEventListener('touchend', () => {
-            if (longPressTimer) clearTimeout(longPressTimer);
-            startX = null; startY = null;
         });
 
         function processDirection(dir) {
@@ -220,8 +224,7 @@
                 const pair = swipeBuffer + dir;
                 const map = {
                     "UU":"0","UR":"1","RU":"2","RR":"3","RD":"4","DR":"5","DD":"6","DL":"7","LD":"8","LL":"9",
-                    "LU":" ",   // Spacebar once
-                    "UL":"  "   // Spacebar twice
+                    "LU":" ", "UL":"  "
                 };
                 if (map[pair] !== undefined) {
                     collectedCode += map[pair];
@@ -235,7 +238,6 @@
             if (collectedCode.length === 0) return;
             navigator.vibrate(800);
             lastSentCode = collectedCode;
-            
             fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
                 mode: 'no-cors',
