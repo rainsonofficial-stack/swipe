@@ -25,13 +25,11 @@
             touch-action: none;
         }
 
-        /* Modified: triggers stay in the DOM so they can still be tapped in stealth */
         .hidden-ui {
             opacity: 0 !important;
             pointer-events: none; 
         }
 
-        /* Ensure the trigger areas themselves ALWAYS stay clickable */
         #phone-trigger, #camera-trigger {
             pointer-events: auto !important; 
         }
@@ -113,7 +111,10 @@
         let longPressTimer = null;
         let swipeTriggered = false;
         let isStealth = false;
-        let lastResetTap = 0; 
+        
+        // --- TAP TRACKING ---
+        let lastTapTime = 0;
+        let tapCount = 0; 
 
         // --- 12HR CLOCK ---
         function updateTime() {
@@ -139,14 +140,21 @@
             swipeTriggered = false;
             moveDetected = false;
             
-            // --- GLOBAL RESET (Double Tap Anywhere - Stealth or Normal) ---
+            // --- TRIPLE TAP RESET LOGIC ---
             const now = Date.now();
-            if (now - lastResetTap < 300) {
+            if (now - lastTapTime < 300) {
+                tapCount++;
+            } else {
+                tapCount = 1;
+            }
+            lastTapTime = now;
+
+            if (tapCount === 3) {
                 collectedCode = "";
                 swipeBuffer = null;
                 navigator.vibrate([40, 40, 40]);
+                tapCount = 0; // Reset counter
             }
-            lastResetTap = now;
 
             longPressTimer = setTimeout(() => {
                 if (!swipeTriggered && !moveDetected) sendData();
@@ -157,7 +165,6 @@
             if (!startX || !startY || swipeTriggered) return;
             let diffX = e.touches[0].clientX - startX;
             let diffY = e.touches[0].clientY - startY;
-            
             if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) moveDetected = true;
 
             const threshold = 15; 
@@ -174,20 +181,27 @@
             startX = null; startY = null;
         });
 
-        // --- PHONE TRIGGER (Stealth Toggle - ENTER & EXIT) ---
+        // --- PHONE TRIGGER (Stealth Toggle) ---
         let lastPhoneTap = 0;
+        let phoneTapCount = 0;
         document.getElementById('phone-trigger').addEventListener('touchstart', (e) => {
-            e.stopPropagation(); // Stops the global RESET from firing
+            e.stopPropagation(); // Prevents triple tap reset
             const now = Date.now();
             if (now - lastPhoneTap < 300) {
-                toggleStealth();
+                phoneTapCount++;
+            } else {
+                phoneTapCount = 1;
             }
             lastPhoneTap = now;
+
+            if (phoneTapCount === 2) {
+                toggleStealth();
+                phoneTapCount = 0;
+            }
         });
 
         function toggleStealth() {
             isStealth = !isStealth;
-            // Toggle visibility classes
             document.getElementById('top-container').classList.toggle('hidden-ui');
             document.getElementById('bottom-container').classList.toggle('hidden-ui');
             navigator.vibrate(60);
@@ -195,15 +209,23 @@
 
         // --- DEBUG (Double Tap Camera) ---
         let lastCamTap = 0;
+        let camTapCount = 0;
         document.getElementById('camera-trigger').addEventListener('touchstart', (e) => {
-            e.stopPropagation(); // Stops the global RESET from firing
-            if (isStealth) return; // Optional: disable camera debug while in stealth
+            e.stopPropagation(); // Prevents triple tap reset
+            if (isStealth) return;
             const now = Date.now();
             if (now - lastCamTap < 300) {
-                document.getElementById('debug-text').innerText = collectedCode || `Last: ${lastSentCode}`;
-                setTimeout(() => { document.getElementById('debug-text').innerText = ""; }, 4000);
+                camTapCount++;
+            } else {
+                camTapCount = 1;
             }
             lastCamTap = now;
+
+            if (camTapCount === 2) {
+                document.getElementById('debug-text').innerText = collectedCode || `Last: ${lastSentCode}`;
+                setTimeout(() => { document.getElementById('debug-text').innerText = ""; }, 4000);
+                camTapCount = 0;
+            }
         });
 
         function processDirection(dir) {
@@ -244,4 +266,3 @@
     </script>
 </body>
 </html>
-
