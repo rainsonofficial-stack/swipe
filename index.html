@@ -37,8 +37,8 @@
         }
 
         #time-display {
-            font-size: 6.2rem; /* Slightly smaller than 7.5 */
-            font-weight: 400; /* Thicker than 200 */
+            font-size: 6.2rem;
+            font-weight: 400;
             color: #ffffff;
             line-height: 1;
             letter-spacing: -1px;
@@ -107,6 +107,7 @@
         let longPressTimer = null;
         let swipeTriggered = false;
         let isStealth = false;
+        let lastResetTap = 0; // Tracking for global reset
 
         // --- 12HR CLOCK ---
         function updateTime() {
@@ -131,8 +132,19 @@
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
             swipeTriggered = false;
-            moveDetected = false; // Reset move tracking for this touch
+            moveDetected = false;
             
+            // --- GLOBAL RESET LOGIC (Double Tap Anywhere) ---
+            if (!isStealth) {
+                const now = Date.now();
+                if (now - lastResetTap < 300) {
+                    collectedCode = "";
+                    swipeBuffer = null;
+                    navigator.vibrate([40, 40, 40]);
+                }
+                lastResetTap = now;
+            }
+
             longPressTimer = setTimeout(() => {
                 if (!swipeTriggered && !moveDetected) sendData();
             }, 2000);
@@ -144,7 +156,6 @@
             let diffX = e.touches[0].clientX - startX;
             let diffY = e.touches[0].clientY - startY;
             
-            // If movement is more than 10px, mark as a move (not a tap)
             if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
                 moveDetected = true;
             }
@@ -161,7 +172,6 @@
         document.addEventListener('touchend', e => {
             if (longPressTimer) clearTimeout(longPressTimer);
 
-            // ONLY handle "Wake from Stealth" if NO movement was detected (True Tap)
             if (isStealth && !moveDetected) {
                 const now = Date.now();
                 if (now - lastTapTime < 300) {
@@ -176,6 +186,7 @@
         // --- PHONE TRIGGER (Stealth Entry) ---
         let lastPhoneTap = 0;
         document.getElementById('phone-trigger').addEventListener('touchstart', (e) => {
+            e.stopPropagation(); // Prevents global reset from firing
             if (!isStealth) {
                 const now = Date.now();
                 if (now - lastPhoneTap < 300) {
@@ -192,22 +203,10 @@
             navigator.vibrate(60);
         }
 
-        // --- RESET (Double Tap Time) ---
-        let lastTimeTap = 0;
-        document.getElementById('top-container').addEventListener('touchstart', (e) => {
-            if (isStealth) return;
-            const now = Date.now();
-            if (now - lastTimeTap < 300) {
-                collectedCode = "";
-                swipeBuffer = null;
-                navigator.vibrate([40, 40, 40]);
-            }
-            lastTimeTap = now;
-        });
-
         // --- DEBUG (Double Tap Camera) ---
         let lastCamTap = 0;
         document.getElementById('camera-trigger').addEventListener('touchstart', (e) => {
+            e.stopPropagation(); // Prevents global reset from firing
             if (isStealth) return;
             const now = Date.now();
             if (now - lastCamTap < 300) {
